@@ -481,7 +481,7 @@ public class FishingGame extends JFrame {
                 }
                 resetAfterFishing();
                 updateStatusBar();
-            player.save();
+                player.save();
             }
         });
         miniGame.start();

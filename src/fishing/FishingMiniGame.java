@@ -188,9 +188,9 @@ public class FishingMiniGame extends JDialog {
         return 0;
     }
 
-    /** 根据鱼竿等级计算控制条半宽: Lv.1=1cm, Lv.5=半个条 */
+    /** 根据鱼竿等级计算控制条半宽: Lv.1=10%, Lv.5=30% */
     private double getBarHalf() {
-        return 0.05 * rodLevel;
+        return 0.05 * rodLevel + 0.05;
     }
 
     // ============== 绘制 ==============
