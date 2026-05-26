@@ -1,0 +1,1087 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
+<title>钓鱼大师</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;user-select:none}
+body{background:#1a2a4a;font-family:-apple-system,'PingFang SC','Microsoft YaHei',sans-serif;color:#fff;overflow-x:hidden;touch-action:manipulation}
+/* 状态栏 */
+#statusBar{display:flex;align-items:center;justify-content:space-between;background:#3a6aae;padding:8px 12px;font-size:14px;flex-wrap:wrap;gap:4px}
+#statusBar .stat{font-weight:700}
+.gold{color:#ffd700}
+.rod{color:#fff}
+#statusBar select{background:#4a7abe;color:#fff;border:1px solid#6a9ade;border-radius:4px;padding:3px 6px;font-size:13px}
+/* 导航 */
+#nav{display:flex;background:#3a5a8e;padding:4px;gap:3px;flex-wrap:wrap;justify-content:center}
+#nav button{flex:1;min-width:60px;background:#4a7abe;color:#fff;border:none;border-radius:6px;padding:8px 4px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap}
+#nav button.active{background:#5a8ace;box-shadow:inset 0-2px 0#ffd700}
+#nav button.danger{background:#b55a3a}
+/* 面板 */
+.panel{display:none;padding:8px;max-width:500px;margin:0 auto}
+.panel.active{display:block}
+/* 钓鱼场景 */
+#fishScene{position:relative;width:100%;aspect-ratio:4/3;background:#87beeb;border-radius:8px;overflow:hidden;touch-action:none}
+#fishScene canvas{width:100%;height:100%;display:block}
+#fishControls{display:flex;justify-content:center;gap:10px;padding:8px 0}
+#fishControls button{padding:10px 24px;border:none;border-radius:8px;font-size:16px;font-weight:700;cursor:pointer;color:#fff}
+#castBtn{background:#2a7ade;display:inline-block}
+#hookBtn{background:#d44;display:none;animation:pulse .5s infinite alternate}
+@keyframes pulse{from{transform:scale(1)}to{transform:scale(1.08)}}
+#statusText{text-align:center;font-size:13px;padding:4px;color:#ccc;min-height:20px}
+#log{background:#0a1a2a;border-radius:6px;padding:6px;font-size:11px;height:80px;overflow-y:auto;margin-top:4px;color:#8ab}
+#log div{padding:1px 0}
+/* 小游戏弹窗 */
+#miniGameOverlay{display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.7);z-index:100;justify-content:center;align-items:center}
+#miniGameOverlay.show{display:flex}
+#miniGameBox{background:#1a2a4a;border-radius:12px;padding:10px;width:280px;max-width:90vw;text-align:center}
+#miniGameBox canvas{width:100%;aspect-ratio:2/5;background:#0a1a3a;border-radius:8px;touch-action:none}
+#miniGameBox .tip{font-size:12px;color:#aaa;padding:4px}
+/* 通用卡片 */
+.card{background:#2a3a5a;border-radius:8px;padding:10px;margin-bottom:6px}
+.card h3{font-size:14px;margin-bottom:6px;color:#ffd700}
+.card table{width:100%;border-collapse:collapse;font-size:12px}
+.card td,.card th{padding:4px 6px;text-align:left;border-bottom:1px solid#3a4a6a}
+.card th{color:#8ac;font-size:11px}
+.card button{padding:6px 14px;border:none;border-radius:6px;font-size:13px;font-weight:700;cursor:pointer;color:#fff;margin:2px}
+.btn-gold{background:#d4a020}
+.btn-green{background:#2a8a4a}
+.btn-red{background:#c44}
+.btn-blue{background:#3a7ace}
+.btn-small{padding:4px 10px;font-size:12px}
+/* 统计 */
+.stat-row{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid#3a4a6a;font-size:14px}
+.stat-row .val{font-weight:700;color:#6ae}
+/* 弹窗 */
+.modal{display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.6);z-index:200;justify-content:center;align-items:center}
+.modal.show{display:flex}
+.modal-content{background:#2a3a5a;border-radius:12px;padding:20px;max-width:320px;text-align:center}
+.modal-content h2{color:#ffd700;margin-bottom:8px}
+.modal-content .big-emoji{font-size:48px}
+.modal-content button{margin-top:12px;padding:8px 24px;border:none;border-radius:8px;font-size:16px;background:#d4a020;color:#fff;cursor:pointer}
+.scroll{max-height:300px;overflow-y:auto}
+</style>
+</head>
+<body>
+
+<div id="statusBar">
+<div><span class="gold stat" id="goldDisplay">💰 0</span></div>
+<div><span class="rod stat" id="rodDisplay">🎣 Lv.1</span></div>
+<div>
+<select id="spotSelect"><option>湖泊</option><option>河流</option><option>海洋</option></select>
+</div>
+</div>
+
+<div id="nav">
+<button class="active" data-panel="fish">🎣钓</button>
+<button data-panel="inventory">🎒包</button>
+<button data-panel="collection">📖图</button>
+<button data-panel="stats">📊统</button>
+<button data-panel="upgrade">⬆升</button>
+<button class="danger" data-panel="admin">⚙️管</button>
+</div>
+
+<!-- 钓鱼面板 -->
+<div class="panel active" id="panel-fish">
+<div id="fishScene"><canvas id="sceneCanvas"></canvas></div>
+<div id="fishControls">
+<button id="castBtn">🎣 抛竿</button>
+<button id="hookBtn">🎯 提竿！</button>
+</div>
+<div id="statusText">点击「抛竿」开始钓鱼</div>
+<div id="log"></div>
+</div>
+
+<!-- 背包面板 -->
+<div class="panel" id="panel-inventory">
+<div class="card">
+<h3>🎒 背包</h3>
+<div style="max-height:250px;overflow-y:auto">
+<table><thead><tr><th>鱼</th><th>稀有度</th><th>重量</th><th>价格</th><th></th></tr></thead>
+<tbody id="invBody"></tbody></table></div>
+<div style="padding:6px 0;font-size:13px" id="invInfo">共 0 条鱼</div>
+</div>
+</div>
+
+<!-- 图鉴面板 -->
+<div class="panel" id="panel-collection">
+<div class="card"><h3>📖 鱼类图鉴</h3>
+<div class="scroll">
+<table><thead><tr><th></th><th>名称</th><th>稀有度</th><th>水域</th></tr></thead>
+<tbody id="colBody"></tbody></table></div>
+<div style="font-size:11px;color:#888;padding:4px">❌=未钓到 ✅=已收集</div>
+</div></div>
+
+<!-- 统计面板 -->
+<div class="panel" id="panel-stats">
+<div class="card"><h3>📊 钓鱼统计</h3>
+<div class="stat-row"><span>🎣 总钓鱼数</span><span class="val" id="sTotal">0</span></div>
+<div class="stat-row"><span>💰 总赚金币</span><span class="val" id="sGold">0</span></div>
+<div class="stat-row"><span>✨ 稀有鱼</span><span class="val" id="sRare">0</span></div>
+<div class="stat-row"><span>🌟 传说鱼</span><span class="val" id="sLegend">0</span></div>
+<div class="stat-row"><span>📖 图鉴</span><span class="val" id="sCol">0/27</span></div>
+<div class="stat-row"><span>🎣 鱼竿</span><span class="val" id="sRod">Lv.1</span></div>
+</div></div>
+
+<!-- 升级面板 -->
+<div class="panel" id="panel-upgrade">
+<div class="card" style="text-align:center">
+<h3>⬆ 鱼竿升级</h3>
+<p style="font-size:16px;padding:6px" id="uLevel">🎣 Lv.1（最大 Lv.5）</p>
+<p style="font-size:13px;color:#aaa" id="uEffect">控制条大小将随等级增长</p>
+<p style="font-size:14px;padding:4px" id="uCost">升级费用：30 金币</p>
+<button class="btn-gold" id="uBtn" style="font-size:15px;padding:10px 30px">⬆ 升级</button>
+<p style="font-size:12px;padding:4px;min-height:20px" id="uInfo"></p>
+</div></div>
+
+<!-- 管理员面板 -->
+<div class="panel" id="panel-admin">
+<div class="card" style="text-align:center">
+<h3>⚙️ 管理员</h3>
+<div style="display:flex;flex-wrap:wrap;gap:6px;justify-content:center;padding:6px">
+<button class="btn-gold" onclick="Game.addGold(100)">💰 +100 金</button>
+<button class="btn-gold" onclick="Game.addGold(500)">💰 +500 金</button>
+<button class="btn-green" onclick="Game.maxRod()">🎣 满级鱼竿</button>
+<button class="btn-green" onclick="Game.fillGold()">💸 金币拉满</button>
+</div>
+<hr style="border-color:#3a4a6a;margin:8px 0">
+<div style="display:flex;flex-wrap:wrap;gap:6px;justify-content:center;padding:6px">
+<button class="btn-blue" onclick="Game.save();UI.addLog('💾 游戏已保存');">💾 保存游戏</button>
+<button class="btn-red" onclick="Game.resetGame()">🔄 重新开始</button>
+</div></div></div>
+
+<!-- 小游戏弹窗 -->
+<div id="miniGameOverlay"><div id="miniGameBox">
+<canvas id="miniCanvas"></canvas>
+<div class="tip">👆 按住上提，松开下降</div>
+</div></div>
+
+<!-- 传说鱼弹窗 -->
+<div class="modal" id="legendModal"><div class="modal-content">
+<h2>🌟🌟🌟 传说之鱼！</h2>
+<div class="big-emoji" id="legendEmoji">🐉</div>
+<p style="font-size:18px;font-weight:700" id="legendName">金龙鱼</p>
+<p id="legendInfo">10斤 120金币</p>
+<p style="font-size:13px;color:#aaa" id="legendDesc">传说中的风水鱼！</p>
+<button onclick="closeLegend()">太棒了！</button>
+</div></div>
+
+<script>
+// ======================== 游戏引擎 ========================
+const Game = {
+    gold: 20, rodLevel: 1, currentSpot: '湖泊',
+    inventory: [], collection: new Set(),
+    totalCaught: 0, totalGoldEarned: 0, rareCaught: 0, legendaryCaught: 0,
+
+    // 鱼库: [名称, 稀有度, 最小重量, 最大重量, 基数价格, emoji, 描述, 难度, 水域]
+    fishDB: [
+        // 湖泊
+        ['鲫鱼','普通',1,3,6,'🐟','最常见的淡水鱼',10,0],
+        ['鲤鱼','普通',2,5,10,'🐟','力气大，手感不错',15,0],
+        ['草鱼','普通',3,7,12,'🐟','草食性鱼类，肉质鲜美',18,0],
+        ['白条鱼','普通',0.5,2,4,'🐟','小鱼一条',5,0],
+        ['鲶鱼','普通',4,8,15,'🐟','滑溜溜的，不好抓',25,0],
+        ['鳜鱼','稀有',2,4,30,'🐠','淡水中的美味珍品',45,0],
+        ['鲈鱼','稀有',3,6,35,'🐠','清蒸鲈鱼，想想就香',50,0],
+        ['黑鱼','稀有',4,7,40,'🐠','生性凶猛，拉力强',55,0],
+        ['金龙鱼','传说',6,12,120,'🐲','传说中的风水鱼！',80,0],
+        ['锦鲤','传说',4,8,100,'🐟','带来好运的吉祥之鱼',75,0],
+        // 河流
+        ['白条鱼','普通',0.5,1.5,3,'🐟','河里到处都是',5,1],
+        ['鲫鱼','普通',1,3,6,'🐟','河产鲫鱼',10,1],
+        ['马口鱼','普通',0.3,1,5,'🐟','嘴巴特别大',8,1],
+        ['虹鳟鱼','稀有',2,4,32,'🐠','色彩斑斓',48,1],
+        ['鳜鱼','稀有',2,5,35,'🐠','河中珍品',50,1],
+        ['鲶鱼','稀有',6,12,45,'🐠','大河鲶鱼',60,1],
+        ['中华鲟','传说',12,25,200,'🐳','水中大熊猫！',90,1],
+        ['金龙鱼','传说',5,10,130,'🐲','河神化身？',85,1],
+        // 海洋
+        ['沙丁鱼','普通',0.2,0.5,4,'🐟','小鱼小虾',3,2],
+        ['小黄鱼','普通',0.3,0.8,8,'🐟','味道鲜美',12,2],
+        ['带鱼','普通',1,3,12,'🐟','长条形的海鱼',20,2],
+        ['石斑鱼','稀有',3,7,50,'🐠','名贵海鱼',55,2],
+        ['鲷鱼','稀有',2,5,40,'🐠','日料常客',45,2],
+        ['金枪鱼','稀有',20,60,80,'🐠','海洋战斗机',65,2],
+        ['蓝鳍金枪鱼','传说',50,100,300,'🐳','鱼中贵族！',95,2],
+        ['美人鱼','传说',3,8,888,'🧜','你钓到了美人鱼？！',100,2],
+    ],
+
+    getSpotFish(spot) {
+        const idx = ['湖泊','河流','海洋'].indexOf(spot);
+        return this.fishDB.filter(f => f[8]===idx);
+    },
+
+    getBarHalf() { return 0.05 * this.rodLevel + 0.05; },
+
+    // 存档
+    save() {
+        const data = {
+            gold: this.gold, rodLevel: this.rodLevel, currentSpot: this.currentSpot,
+            inventory: this.inventory, collection: [...this.collection],
+            totalCaught: this.totalCaught, totalGoldEarned: this.totalGoldEarned,
+            rareCaught: this.rareCaught, legendaryCaught: this.legendaryCaught
+        };
+        try { localStorage.setItem('fishingGame', JSON.stringify(data)); } catch(e) {}
+    },
+
+    load() {
+        try {
+            const raw = localStorage.getItem('fishingGame');
+            if (!raw) return;
+            const data = JSON.parse(raw);
+            Object.assign(this, data);
+            this.collection = new Set(data.collection || []);
+        } catch(e) {}
+    },
+
+    addGold(n) { this.gold += n; this.save(); UI.updateAll(); },
+    fillGold() { this.gold = 9999; this.save(); UI.updateAll(); },
+    maxRod() { this.rodLevel = 5; this.save(); UI.updateAll(); },
+
+    addFish(fish) {
+        this.inventory.push(fish);
+        this.collection.add(fish.name);
+        this.totalCaught++;
+        if (fish.rarity === '传说') this.legendaryCaught++;
+        else if (fish.rarity === '稀有') this.rareCaught++;
+        this.save();
+    },
+
+    removeFish(idx) {
+        if (idx >= 0 && idx < this.inventory.length) this.inventory.splice(idx, 1);
+        this.save();
+    },
+
+    sellFish(idx) {
+        const f = this.inventory[idx];
+        if (!f) return;
+        this.gold += f.price;
+        this.totalGoldEarned += f.price;
+        this.removeFish(idx);
+        this.save();
+        UI.updateAll();
+        UI.refreshInv();
+        UI.addLog(`💰 卖出 ${f.name}，获得 ${f.price} 金币`);
+    },
+
+    getUpgradeCost() { return this.rodLevel * 30; },
+    isMaxLevel() { return this.rodLevel >= 5; },
+
+    upgradeRod() {
+        if (this.isMaxLevel()) return false;
+        const cost = this.getUpgradeCost();
+        if (this.gold < cost) return false;
+        this.gold -= cost;
+        this.rodLevel++;
+        this.save();
+        UI.updateAll();
+        UI.addLog(`⬆ 鱼竿升级到 Lv.${this.rodLevel}！`);
+        return true;
+    },
+
+    getTotalInvValue() {
+        return this.inventory.reduce((s,f) => s + f.price, 0);
+    },
+
+    // 重新开始——清空所有数据
+    resetGame() {
+        if (!confirm('确定重新开始？所有进度将被清空！')) return;
+        this.gold = 20;
+        this.rodLevel = 1;
+        this.currentSpot = '湖泊';
+        this.inventory = [];
+        this.collection = new Set();
+        this.totalCaught = 0;
+        this.totalGoldEarned = 0;
+        this.rareCaught = 0;
+        this.legendaryCaught = 0;
+        this.save();
+        UI.updateAll();
+        UI.addLog('🔄 游戏已重置，重新开始！');
+    }
+};
+
+// ======================== UI ========================
+const UI = {
+    sceneCtx: null, sceneW: 0, sceneH: 0,
+    miniCtx: null, miniW: 0, miniH: 0,
+    state: 'idle', // idle | casting | waiting | fishNear | biting
+    powerValue: 0, powerHolding: false,
+    bobPhase: 0, bobberY: 0.4, fishX: -0.2, fishAlpha: 0,
+    fishBiting: false, biteTimer: null, flashTimer: null,
+    sceneAnimId: null,
+
+    init() {
+        Game.load();
+        this.setupScene();
+        this.setupMiniGame();
+        this.setupEvents();
+        this.updateAll();
+        this.startSceneAnim();
+    },
+
+    setupScene() {
+        const canvas = document.getElementById('sceneCanvas');
+        const rect = canvas.parentElement.getBoundingClientRect();
+        const dpr = window.devicePixelRatio || 1;
+        canvas.width = rect.width * dpr;
+        canvas.height = rect.height * dpr;
+        canvas.style.width = rect.width + 'px';
+        canvas.style.height = rect.height + 'px';
+        this.sceneCtx = canvas.getContext('2d');
+        this.sceneCtx.scale(dpr, dpr);
+        this.sceneW = rect.width;
+        this.sceneH = rect.height;
+    },
+
+    setupMiniGame() {
+        const canvas = document.getElementById('miniCanvas');
+        const w = Math.min(260, window.innerWidth * 0.8);
+        const h = w * 2.5;
+        const dpr = window.devicePixelRatio || 1;
+        canvas.width = w * dpr;
+        canvas.height = h * dpr;
+        canvas.style.width = w + 'px';
+        canvas.style.height = h + 'px';
+        this.miniCtx = canvas.getContext('2d');
+        this.miniCtx.scale(dpr, dpr);
+        this.miniW = w;
+        this.miniH = h;
+    },
+
+    setupEvents() {
+        // 导航
+        document.querySelectorAll('#nav button').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('#nav button').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+                document.getElementById('panel-' + btn.dataset.panel).classList.add('active');
+                if (btn.dataset.panel === 'inventory') this.refreshInv();
+                if (btn.dataset.panel === 'collection') this.refreshCol();
+                if (btn.dataset.panel === 'stats') this.refreshStats();
+                if (btn.dataset.panel === 'upgrade') this.refreshUpgrade();
+            });
+        });
+
+        // 钓点切换
+        document.getElementById('spotSelect').addEventListener('change', e => {
+            Game.currentSpot = e.target.value;
+            UI.addLog(`切换到 ${Game.currentSpot} 垂钓`);
+        });
+
+        // 抛竿
+        document.getElementById('castBtn').addEventListener('click', () => this.startCast());
+
+        // 提竿
+        document.getElementById('hookBtn').addEventListener('click', () => this.doHook());
+
+        // 场景触摸蓄力
+        const scene = document.getElementById('fishScene');
+        scene.addEventListener('touchstart', e => { if (UI.state === 'casting') { e.preventDefault(); UI.powerHolding = true; } });
+        scene.addEventListener('touchend', e => { if (UI.state === 'casting' && UI.powerHolding) { e.preventDefault(); UI.powerHolding = false; UI.releaseCast(); } });
+        scene.addEventListener('mousedown', e => { if (UI.state === 'casting') UI.powerHolding = true; });
+        scene.addEventListener('mouseup', e => { if (UI.state === 'casting' && UI.powerHolding) { UI.powerHolding = false; UI.releaseCast(); } });
+
+        // 小游戏触摸
+        const mc = document.getElementById('miniCanvas');
+        mc.addEventListener('touchstart', e => { e.preventDefault(); MiniGame.holding = true; });
+        mc.addEventListener('touchend', e => { e.preventDefault(); MiniGame.holding = false; });
+        mc.addEventListener('mousedown', () => MiniGame.holding = true);
+        mc.addEventListener('mouseup', () => MiniGame.holding = false);
+    },
+
+    // ========== 场景动画 ==========
+    startSceneAnim() {
+        const loop = () => {
+            this.animateScene();
+            this.drawScene();
+            this.sceneAnimId = requestAnimationFrame(loop);
+        };
+        loop();
+    },
+
+    animateScene() {
+        this.bobPhase += 0.05;
+        switch (this.state) {
+            case 'casting':
+                if (this.powerHolding) {
+                    this.powerValue = Math.min(1, this.powerValue + 0.03);
+                }
+                break;
+            case 'waiting':
+                this.bobberY = 0.4 + Math.sin(this.bobPhase) * 0.008;
+                break;
+            case 'fishNear':
+                if (this.fishX < 1.3) this.fishX += 0.01;
+                this.fishAlpha = Math.min(0.5, this.fishAlpha + 0.02);
+                this.bobberY = 0.4 + Math.sin(this.bobPhase * 2) * 0.012;
+                break;
+            case 'biting':
+                this.bobberY = Math.min(0.55, this.bobberY + 0.006);
+                break;
+        }
+    },
+
+    drawScene() {
+        const ctx = this.sceneCtx, w = this.sceneW, h = this.sceneH;
+        if (!ctx) return;
+        ctx.clearRect(0, 0, w, h);
+
+        const waterLine = h * 0.55;
+        // 天空
+        const skyGrad = ctx.createLinearGradient(0, 0, 0, waterLine);
+        skyGrad.addColorStop(0, '#5a8ece');
+        skyGrad.addColorStop(1, '#b8d8f8');
+        ctx.fillStyle = skyGrad;
+        ctx.fillRect(0, 0, w, waterLine);
+
+        // 山
+        ctx.fillStyle = 'rgba(60,120,70,0.3)';
+        for (let i = 0; i < 3; i++) {
+            const cx = w * i / 3, cy = waterLine - 15;
+            ctx.beginPath();
+            ctx.arc(cx, cy, 50, Math.PI, 0);
+            ctx.fill();
+        }
+
+        // 水面
+        const waterGrad = ctx.createLinearGradient(0, waterLine, 0, h);
+        const spot = Game.currentSpot;
+        if (spot === '湖泊') { waterGrad.addColorStop(0, '#3a8ace'); waterGrad.addColorStop(1, '#1a4a7a'); }
+        else if (spot === '河流') { waterGrad.addColorStop(0, '#3aaa7a'); waterGrad.addColorStop(1, '#1a6a4a'); }
+        else { waterGrad.addColorStop(0, '#2a6aae'); waterGrad.addColorStop(1, '#0a2a5a'); }
+        ctx.fillStyle = waterGrad;
+        ctx.fillRect(0, waterLine, w, h - waterLine);
+
+        // 水纹
+        for (let i = 0; i < 6; i++) {
+            ctx.strokeStyle = `rgba(255,255,255,${0.04 + i * 0.02})`;
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            const by = waterLine + (h - waterLine) * i / 6;
+            for (let x = 0; x <= w; x += 2) {
+                const yy = by + Math.sin((x + this.bobPhase * 40 + i * 25) * 0.04) * 2.5;
+                x === 0 ? ctx.moveTo(x, yy) : ctx.lineTo(x, yy);
+            }
+            ctx.stroke();
+        }
+
+        const cx = w / 2;
+
+        // 鱼线
+        if (this.state !== 'idle' && this.state !== 'casting') {
+            const by = waterLine + (h - waterLine) * this.bobberY;
+            ctx.strokeStyle = 'rgba(200,200,200,0.5)';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.moveTo(cx, 10);
+            ctx.lineTo(cx, by);
+            ctx.stroke();
+        }
+
+        // 浮漂
+        if (this.state === 'waiting' || this.state === 'fishNear') {
+            const by = waterLine + (h - waterLine) * this.bobberY;
+            const r = 7;
+            ctx.fillStyle = 'rgba(255,255,200,0.15)';
+            ctx.beginPath(); ctx.arc(cx, by, r + 4, 0, Math.PI * 2); ctx.fill();
+            ctx.fillStyle = '#d44';
+            ctx.beginPath(); ctx.arc(cx, by, r, 0, Math.PI * 2); ctx.fill();
+            ctx.fillStyle = '#fff';
+            ctx.beginPath(); ctx.arc(cx, by, r / 2, 0, Math.PI * 2); ctx.fill();
+            // 涟漪
+            for (let ri = 0; ri < 3; ri++) {
+                ctx.strokeStyle = `rgba(255,255,255,${0.15 - ri * 0.04})`;
+                ctx.lineWidth = 1;
+                const s = ri * 5 + 12;
+                ctx.beginPath();
+                ctx.ellipse(cx, by + 2, s / 2, s / 4, 0, 0, Math.PI * 2);
+                ctx.stroke();
+            }
+        }
+
+        // 鱼影
+        if (this.state === 'fishNear' || this.state === 'biting') {
+            const fx = this.fishX * w / 3 + w / 4;
+            const fy = waterLine + (h - waterLine) * 0.55;
+            ctx.fillStyle = `rgba(40,40,40,${this.fishAlpha * 0.3})`;
+            ctx.beginPath();
+            ctx.ellipse(fx, fy, 30, 10, 0, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.beginPath();
+            ctx.ellipse(fx - 5, fy - 3, 18, 6, 0, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        // 咬钩水花
+        if (this.state === 'biting') {
+            const by = waterLine + (h - waterLine) * this.bobberY;
+            ctx.fillStyle = 'rgba(255,255,255,0.4)';
+            for (let s = 0; s < 5; s++) {
+                const sx = cx + Math.sin(this.bobPhase + s * 1.3) * (s * 3 + 6);
+                const sy = by - 4 + s * 2;
+                ctx.beginPath();
+                ctx.arc(sx, sy, 2 + s * 0.3, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
+
+        // 蓄力条
+        if (this.state === 'casting') {
+            const bl = 15, bw = 18, bh = h - 80, bt = 40;
+            ctx.fillStyle = 'rgba(20,20,40,0.7)';
+            UI.roundRect(ctx, bl, bt, bw, bh, 6);
+            ctx.fill();
+
+            const fh = bh * this.powerValue;
+            const ft = bt + bh - fh;
+            let pc;
+            if (this.powerValue < 0.4) pc = '#2aee4a';
+            else if (this.powerValue < 0.7) pc = '#eecc2a';
+            else pc = '#ee3a3a';
+            ctx.fillStyle = pc;
+            UI.roundRect(ctx, bl + 2, ft, bw - 4, fh, 4);
+            ctx.fill();
+
+            ctx.strokeStyle = 'rgba(200,200,220,0.5)';
+            ctx.lineWidth = 1.5;
+            UI.roundRect(ctx, bl, bt, bw, bh, 6);
+            ctx.stroke();
+
+            ctx.fillStyle = '#fff';
+            ctx.font = 'bold 11px sans-serif';
+            ctx.textAlign = 'center';
+            ctx.fillText('蓄力', bl + bw / 2, bt - 5);
+            ctx.fillText(Math.round(this.powerValue * 100) + '%', bl + bw / 2, bt + bh + 14);
+
+            if (!this.powerHolding) {
+                ctx.fillStyle = 'rgba(255,255,200,0.7)';
+                ctx.font = '12px sans-serif';
+                ctx.fillText('👆 按住蓄力，松开抛竿', w / 2, h - 10);
+            }
+        }
+
+        // IDLE 提示
+        if (this.state === 'idle') {
+            ctx.fillStyle = 'rgba(255,255,255,0.5)';
+            ctx.font = '15px sans-serif';
+            ctx.textAlign = 'center';
+            ctx.fillText('点击「抛竿」开始钓鱼', w / 2, h / 2 + 20);
+        }
+    },
+
+    roundRect(ctx, x, y, w, h, r) {
+        ctx.beginPath();
+        ctx.moveTo(x + r, y);
+        ctx.lineTo(x + w - r, y);
+        ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+        ctx.lineTo(x + w, y + h - r);
+        ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+        ctx.lineTo(x + r, y + h);
+        ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+        ctx.lineTo(x, y + r);
+        ctx.quadraticCurveTo(x, y, x + r, y);
+        ctx.closePath();
+    },
+
+    // ========== 钓鱼流程 ==========
+    startCast() {
+        this.state = 'casting';
+        this.powerValue = 0;
+        this.powerHolding = false;
+        document.getElementById('castBtn').style.display = 'none';
+        document.getElementById('hookBtn').style.display = 'none';
+        document.getElementById('statusText').textContent = '🎣 按住画面蓄力，松开抛竿！';
+        document.getElementById('statusText').style.color = '#fa0';
+    },
+
+    releaseCast() {
+        if (this.state !== 'casting') return;
+        const power = this.powerValue;
+        this.state = 'waiting';
+        this.bobberY = 0.4;
+        this.fishX = -0.2;
+        this.fishAlpha = 0;
+
+        document.getElementById('statusText').textContent = '🐟 等待鱼儿上钩...';
+        document.getElementById('statusText').style.color = '#aaa';
+        UI.addLog(`💨 抛竿！（力度 ${Math.round(power * 100)}%）`);
+        this.castPower = power;  // 保存力度用于选鱼
+
+        // 鱼靠近
+        setTimeout(() => {
+            if (this.state !== 'waiting') return;
+            this.state = 'fishNear';
+            document.getElementById('statusText').textContent = '🐟 有鱼在附近游动...';
+            document.getElementById('statusText').style.color = '#4a4';
+            // 咬钩
+            setTimeout(() => {
+                if (this.state !== 'fishNear') return;
+                this.enterBiting();
+            }, 500 + Math.random() * 1000);
+    }, 800 + Math.random() * 1200);
+    },
+
+    enterBiting() {
+        this.state = 'biting';
+        this.fishBiting = true;
+        document.getElementById('hookBtn').style.display = 'inline-block';
+        document.getElementById('statusText').textContent = '🎯 咬钩了！快提竿！';
+        document.getElementById('statusText').style.color = '#e44';
+
+        // 超时
+        this.biteTimer = setTimeout(() => {
+            this.fishBiting = false;
+            document.getElementById('hookBtn').style.display = 'none';
+            document.getElementById('statusText').textContent = '❌ 鱼跑了...下次快点提竿！';
+            document.getElementById('statusText').style.color = '#e44';
+            UI.addLog('❌ 反应太慢，鱼跑了');
+            this.resetAfterFish();
+        }, 3500);
+    },
+
+    doHook() {
+        if (!this.fishBiting) return;
+        clearTimeout(this.biteTimer);
+        this.fishBiting = false;
+        document.getElementById('hookBtn').style.display = 'none';
+        document.getElementById('statusText').textContent = '🎯 提竿成功！';
+        document.getElementById('statusText').style.color = '#4a4';
+        UI.addLog('🎯 提竿！鱼上钩了！');
+        this.state = 'idle';
+        this.startMiniGame();
+    },
+
+    resetAfterFish() {
+        this.state = 'idle';
+        document.getElementById('castBtn').style.display = 'inline-block';
+        document.getElementById('hookBtn').style.display = 'none';
+    },
+
+    // ========== 小游戏 ==========
+    startMiniGame() {
+        // 确定鱼 — 同Java版等级权重选鱼（受抛竿力度影响：力度越大鱼越好）
+        const level = Game.rodLevel;
+        const power = this.castPower || 0;
+        const targetLv = 1 + power * 4; // 力度0~1映射到等级1~5
+        let weights = [0, 0, 0, 0, 0, 0]; // index 1~5
+        for (let lv = 1; lv <= 5; lv++) {
+            let baseWeight = Math.max(1, 6 - Math.abs(lv - level));
+            let distFromTarget = Math.abs(lv - targetLv);
+            let powerBonus = Math.max(0, 10 - Math.floor(distFromTarget * 4));
+            weights[lv] = baseWeight + powerBonus;
+        }
+        let totalW = weights.reduce((a, b) => a + b, 0);
+        let roll = Math.random() * totalW;
+        let chosenLevel = 1;
+        for (let lv = 1; lv <= 5; lv++) {
+            roll -= weights[lv];
+            if (roll < 0) { chosenLevel = lv; break; }
+        }
+        // 等级→品质
+        let rarity = chosenLevel >= 5 ? '传说' : chosenLevel >= 3 ? '稀有' : '普通';
+
+        const spotFish = Game.getSpotFish(Game.currentSpot);
+        const cand = spotFish.filter(f => f[1] === rarity);
+        const data = cand.length > 0 ? cand[Math.floor(Math.random() * cand.length)]
+            : spotFish.filter(f => f[1] === '普通')[0];
+
+        this.currentFish = {
+            name: data[0], rarity: data[1], minW: data[2], maxW: data[3],
+            baseP: data[4], emoji: data[5], desc: data[6],
+            difficulty: Math.max(5, data[7] - level * 10 + (chosenLevel - 1) * 5 + (chosenLevel >= 5 ? 30 : 0))
+        };
+
+        // 显示小游戏
+        document.getElementById('miniGameOverlay').classList.add('show');
+        MiniGame.start(this.currentFish, (success, perfect) => {
+            document.getElementById('miniGameOverlay').classList.remove('show');
+            if (success) {
+                const f = this.currentFish;
+                let w = f.minW + Math.random() * (f.maxW - f.minW);
+                w = Math.round(w * 10) / 10;
+                let price = Math.max(1, Math.round(f.baseP * (0.8 + Math.random() * 0.4)));
+                if (perfect) price = Math.round(price * 1.5);
+                const fish = { name: f.name, rarity: f.rarity, weight: w, price: price,
+                    emoji: f.emoji, desc: f.desc, spot: Game.currentSpot };
+                Game.addFish(fish);
+                const pt = perfect ? '✨完美！' : '';
+                document.getElementById('statusText').textContent =
+                    (f.rarity === '传说' ? '🌟' : f.rarity === '稀有' ? '✨' : '🐟') + ' ' + pt
+                    + f.emoji + f.name + ' (' + f.rarity + ') ' + w + '斤';
+                document.getElementById('statusText').style.color = f.rarity === '传说' ? '#fa0'
+                    : f.rarity === '稀有' ? '#48f' : '#4a4';
+                UI.addLog(`🎣 ${f.emoji} ${f.name}(${f.rarity}) ${w}斤 ${price}金币${perfect?' ✨完美！':''}`);
+                if (f.rarity === '传说') UI.showLegend(fish);
+            } else {
+                document.getElementById('statusText').textContent = '❌ 鱼挣脱了...';
+                document.getElementById('statusText').style.color = '#e44';
+                UI.addLog('❌ 鱼挣扎逃脱了');
+            }
+            this.resetAfterFish();
+            UI.updateAll();
+        });
+    },
+
+    showLegend(fish) {
+        document.getElementById('legendEmoji').textContent = fish.emoji || '🐲';
+        document.getElementById('legendName').textContent = fish.name;
+        document.getElementById('legendInfo').textContent = `${fish.weight}斤 ${fish.price}金币`;
+        document.getElementById('legendDesc').textContent = fish.desc;
+        document.getElementById('legendModal').classList.add('show');
+    },
+
+    // ========== 日志 ==========
+    addLog(msg) {
+        const log = document.getElementById('log');
+        const div = document.createElement('div');
+        div.textContent = msg;
+        log.appendChild(div);
+        log.scrollTop = log.scrollHeight;
+        if (log.children.length > 50) log.removeChild(log.firstChild);
+    },
+
+    // ========== 刷新面板 ==========
+    updateAll() {
+        document.getElementById('goldDisplay').textContent = '💰 ' + Game.gold;
+        document.getElementById('rodDisplay').textContent = '🎣 Lv.' + Game.rodLevel;
+        document.getElementById('spotSelect').value = Game.currentSpot;
+    },
+
+    refreshInv() {
+        const tbody = document.getElementById('invBody');
+        tbody.innerHTML = '';
+        Game.inventory.forEach((f, i) => {
+            const tr = document.createElement('tr');
+            const color = f.rarity === '传说' ? '#fa0' : f.rarity === '稀有' ? '#48f' : '#aaa';
+            tr.innerHTML = `<td>${f.emoji||'🐟'}${f.name}</td>
+                <td style="color:${color}">${f.rarity}</td>
+                <td>${f.weight}斤</td>
+                <td>${f.price}金</td>
+                <td><button class="btn-small btn-gold" onclick="Game.sellFish(${i})">卖</button></td>`;
+            tbody.appendChild(tr);
+        });
+        document.getElementById('invInfo').textContent =
+            `共 ${Game.inventory.length} 条鱼 | 总价值 ${Game.getTotalInvValue()} 金币`;
+    },
+
+    refreshCol() {
+        const tbody = document.getElementById('colBody');
+        tbody.innerHTML = '';
+        Game.fishDB.forEach(f => {
+            const collected = Game.collection.has(f[0]);
+            const tr = document.createElement('tr');
+            tr.style.color = collected ? '#4a4' : '#555';
+            tr.innerHTML = `<td>${collected ? '✅' : '❌'}</td>
+                <td>${f[5]}${f[0]}</td>
+                <td>${f[1]}</td>
+                <td>${['湖泊','河流','海洋'][f[8]]}</td>`;
+            tbody.appendChild(tr);
+        });
+    },
+
+    refreshStats() {
+        document.getElementById('sTotal').textContent = Game.totalCaught;
+        document.getElementById('sGold').textContent = Game.totalGoldEarned;
+        document.getElementById('sRare').textContent = Game.rareCaught;
+        document.getElementById('sLegend').textContent = Game.legendaryCaught;
+        document.getElementById('sCol').textContent = Game.collection.size + '/27';
+        document.getElementById('sRod').textContent = 'Lv.' + Game.rodLevel;
+    },
+
+    refreshUpgrade() {
+        document.getElementById('uLevel').textContent = '🎣 Lv.' + Game.rodLevel + '（最大 Lv.5）';
+        document.getElementById('uEffect').textContent =
+            '控制条大小：' + Math.round(Game.getBarHalf() * 100) + '%';
+        if (Game.isMaxLevel()) {
+            document.getElementById('uCost').textContent = '🏆 已满级！';
+            document.getElementById('uBtn').style.display = 'none';
+        } else {
+            document.getElementById('uCost').textContent = '升级费用：' + Game.getUpgradeCost() + ' 金币';
+            document.getElementById('uBtn').style.display = 'inline-block';
+        }
+    }
+};
+
+function closeLegend() { document.getElementById('legendModal').classList.remove('show'); }
+
+// ======================== 小游戏引擎 ========================
+const MiniGame = {
+    fishY: 0.5, fishTargetY: 0.5, fishSpeed: 0.003,
+    barY: 0.5, barVel: 0, progress: 0, difficulty: 10,
+    holding: false, perfect: true, finished: false, missed: 0,
+    fishName: '', fishEmoji: '', callback: null, fishTimer: 0,
+    animId: null, started: false, isLegendary: false, dashCooldown: 0,
+    dashActive: 0, dashSpeedMul: 1.0,
+
+    start(fishData, cb) {
+        this.difficulty = fishData.difficulty;
+        this.fishName = fishData.name;
+        this.fishEmoji = fishData.emoji;
+        this.callback = cb;
+        this.fishY = 0.3 + Math.random() * 0.4;
+        this.fishTargetY = this.fishY;
+        this.barY = 0.5;
+        this.barVel = 0;
+        this.progress = 0;
+        this.perfect = true;
+        this.finished = false;
+        this.missed = 0;
+        this.fishTimer = 0;
+        this.fishSpeed = 0.002 + this.difficulty * 0.0003;
+        this.isLegendary = fishData.rarity === '传说';
+        this.dashCooldown = this.isLegendary ? 30 + Math.floor(Math.random() * 30) : 0;
+        this.dashActive = 0;
+        this.dashSpeedMul = 1.0;
+        this.started = true;
+
+        if (this.animId) cancelAnimationFrame(this.animId);
+        this.loop();
+    },
+
+    loop() {
+        if (!this.started) return;
+        this.update();
+        this.draw();
+        this.animId = requestAnimationFrame(() => this.loop());
+    },
+
+    update() {
+        if (this.finished) return;
+
+        // 鱼
+        this.fishTimer--;
+        if (this.fishTimer <= 0) {
+            let range = 0.12 + this.difficulty * 0.003;
+            if (this.isLegendary) range += 0.05; // 传说鱼跳更远
+            this.fishTargetY = this.fishY + (Math.random() - 0.5) * range;
+            this.fishTargetY = Math.max(0.05, Math.min(0.95, this.fishTargetY));
+            this.fishTimer = this.isLegendary
+                ? Math.max(8, 40 - this.difficulty / 3)  // 传说鱼换向更快
+                : Math.max(12, 55 - this.difficulty / 3);
+        }
+        const diff = this.fishTargetY - this.fishY;
+        const ms = (this.fishSpeed + this.difficulty * 0.0002) * this.dashSpeedMul;
+        if (Math.abs(diff) > 0.01) this.fishY += Math.sign(diff) * ms;
+        this.fishY = Math.max(0.02, Math.min(0.98, this.fishY));
+
+        // 传说鱼特殊机制：平滑冲刺（不瞬移，高速游向目标）
+        if (this.isLegendary) {
+            if (this.dashActive > 0) {
+                // 冲刺中：高速游向目标
+                this.dashActive--;
+                this.dashSpeedMul = 6.0;
+            } else {
+                this.dashSpeedMul = this.isLegendary ? 1.3 : 1.0;
+                this.dashCooldown--;
+                if (this.dashCooldown <= 0) {
+                    // 设定远端目标开始冲刺
+                    this.fishTargetY = 0.05 + Math.random() * 0.9;
+                    this.dashActive = 15 + Math.floor(Math.random() * 15); // 0.25~0.5秒冲刺
+                    this.dashCooldown = 20 + Math.floor(Math.random() * 30); // 0.3~0.8秒冷却
+                    // 偶尔连冲
+                    if (Math.random() < 0.33) {
+                        this.dashCooldown = 5;
+                    }
+                }
+            }
+        }
+
+        // 控制条
+        const barHalf = Game.getBarHalf();
+        const gravity = 0.008;
+        const raise = 0.035;
+        this.barVel += this.holding ? -raise : gravity;
+        this.barVel *= 0.94;
+        const maxSpd = 0.022;
+        if (this.barVel > maxSpd) this.barVel = maxSpd;
+        if (this.barVel < -maxSpd) this.barVel = -maxSpd;
+        this.barY += this.barVel;
+        if (this.barY < barHalf) { this.barY = barHalf; this.barVel = 0; }
+        if (this.barY > 1 - barHalf) { this.barY = 1 - barHalf; this.barVel = 0; }
+
+        // 进度
+        const inBar = Math.abs(this.fishY - this.barY) < (barHalf + 0.015);
+        if (inBar) {
+            this.progress += 0.003 + (1 / Math.max(1, this.difficulty)) * 0.0005;
+            this.missed = 0;
+        } else {
+            this.progress -= 0.004;
+            this.missed++;
+            this.perfect = false;
+            if (this.missed > 80) {
+                this.finished = true;
+                this.started = false;
+                setTimeout(() => { if (this.callback) this.callback(false, false); }, 600);
+                return;
+            }
+        }
+        this.progress = Math.max(0, Math.min(1, this.progress));
+
+        if (this.progress >= 1) {
+            this.finished = true;
+            this.started = false;
+            setTimeout(() => { if (this.callback) this.callback(true, this.perfect); }, 600);
+        }
+    },
+
+    draw() {
+        const ctx = UI.miniCtx, w = UI.miniW, h = UI.miniH;
+        if (!ctx || !this.started) return;
+        ctx.clearRect(0, 0, w, h);
+
+        const ml = 20, mt = 15, aw = w - ml * 2 - 28, ah = h - mt - 30, al = ml;
+
+        // 水面背景
+        const grad = ctx.createLinearGradient(0, mt, 0, mt + ah);
+        const spot = Game.currentSpot;
+        if (spot === '湖泊') { grad.addColorStop(0, '#4a98d4'); grad.addColorStop(1, '#1a4a7a'); }
+        else if (spot === '河流') { grad.addColorStop(0, '#4ab884'); grad.addColorStop(1, '#1a6a4a'); }
+        else { grad.addColorStop(0, '#3a7abe'); grad.addColorStop(1, '#0a2a5a'); }
+        ctx.fillStyle = grad;
+        ctx.fillRect(al, mt, aw, ah);
+
+        // 刻度线
+        ctx.strokeStyle = 'rgba(255,255,255,0.08)';
+        ctx.lineWidth = 1;
+        for (let i = 1; i < 10; i++) {
+            const y = mt + ah * i / 10;
+            ctx.beginPath(); ctx.moveTo(al, y); ctx.lineTo(al + aw, y); ctx.stroke();
+        }
+
+        // 边框
+        ctx.strokeStyle = 'rgba(100,180,255,0.3)';
+        ctx.lineWidth = 1.5;
+        ctx.strokeRect(al, mt, aw, ah);
+
+        // 控制条
+        const bh = Game.getBarHalf();
+        const bt = mt + (this.barY - bh) * ah;
+        const bb = mt + (this.barY + bh) * ah;
+        const bH = bb - bt;
+
+        ctx.shadowColor = 'rgba(80,255,120,0.3)';
+        ctx.shadowBlur = 8;
+        const barGrad = ctx.createLinearGradient(0, bt, 0, bb);
+        barGrad.addColorStop(0, '#3aff6a');
+        barGrad.addColorStop(1, '#00c83a');
+        ctx.fillStyle = barGrad;
+        UI.roundRect(ctx, al + 2, bt, aw - 4, bH, 5);
+        ctx.fill();
+        ctx.shadowBlur = 0;
+        ctx.strokeStyle = '#1aee4a';
+        ctx.lineWidth = 1.5;
+        UI.roundRect(ctx, al + 2, bt, aw - 4, bH, 5);
+        ctx.stroke();
+        // 高光
+        ctx.fillStyle = 'rgba(255,255,255,0.15)';
+        ctx.fillRect(al + 5, bt + 2, aw - 10, bH / 3);
+
+        // 鱼
+        const fx = al + aw / 2;
+        const fy = mt + this.fishY * ah;
+        const inBar = Math.abs(this.fishY - this.barY) < (bh + 0.015);
+        const fc = inBar ? '#ffd43a' : '#ff5a5a';
+
+        ctx.shadowColor = fc + '30';
+        ctx.shadowBlur = 12;
+        ctx.fillStyle = fc;
+        ctx.beginPath();
+        ctx.arc(fx, fy, 7, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.shadowBlur = 0;
+        ctx.fillStyle = '#fff';
+        ctx.beginPath(); ctx.arc(fx + 2, fy - 3, 2.5, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = '#000';
+        ctx.beginPath(); ctx.arc(fx + 3, fy - 3, 1.5, 0, Math.PI * 2); ctx.fill();
+        // 尾巴
+        ctx.fillStyle = fc;
+        ctx.beginPath();
+        ctx.moveTo(fx - 6, fy - 3); ctx.lineTo(fx - 12, fy); ctx.lineTo(fx - 6, fy + 3);
+        ctx.fill();
+
+        // 鱼名
+        ctx.fillStyle = '#fff';
+        ctx.font = 'bold 9px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText(this.fishEmoji + this.fishName, fx, fy - 12);
+
+        // 传说鱼冲刺特效
+        if (this.isLegendary) {
+            // 冲刺尾迹（冲刺进行中）
+            if (this.dashActive > 0) {
+                ctx.strokeStyle = 'rgba(255,200,50,0.5)';
+                ctx.lineWidth = 2;
+                for (let s = 0; s < 5; s++) {
+                    const sx = fx - 14 - s * 6;
+                    const sy = fy - 3 + (s % 2) * 5;
+                    ctx.globalAlpha = 0.6 - s * 0.1;
+                    ctx.beginPath();
+                    ctx.moveTo(sx, sy);
+                    ctx.lineTo(sx + 6, sy);
+                    ctx.stroke();
+                }
+                ctx.globalAlpha = 1;
+            }
+            // 传说鱼标签
+            ctx.fillStyle = '#ffd700';
+            ctx.font = 'bold 10px sans-serif';
+            ctx.textAlign = 'right';
+            ctx.fillText('🌟传说鱼 ⚡', al + aw - 4, mt - 4);
+        }
+
+        // 进度条
+        const pl = al + aw + 10, pw = 10;
+        ctx.fillStyle = '#2a2a3a';
+        UI.roundRect(ctx, pl, mt, pw, ah, 5);
+        ctx.fill();
+        const fh = ah * this.progress;
+        const ft = mt + ah - fh;
+        const pg = ctx.createLinearGradient(0, ft, 0, mt + ah);
+        pg.addColorStop(0, '#4ad8ff');
+        pg.addColorStop(1, '#008ad4');
+        ctx.fillStyle = pg;
+        UI.roundRect(ctx, pl + 1, ft, pw - 2, fh, 4);
+        ctx.fill();
+        ctx.strokeStyle = 'rgba(100,180,255,0.5)';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(pl, mt, pw, ah);
+
+        ctx.fillStyle = '#fff';
+        ctx.font = 'bold 9px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText(Math.round(this.progress * 100) + '%', pl + pw / 2, mt + ah / 2 + 3);
+
+        // 难度
+        ctx.textAlign = 'left';
+        ctx.font = 'bold 10px sans-serif';
+        if (this.difficulty < 20) { ctx.fillStyle = '#8f8'; ctx.fillText('★ 简单', al, mt - 4); }
+        else if (this.difficulty < 50) { ctx.fillStyle = '#fc0'; ctx.fillText('★★ 中等', al, mt - 4); }
+        else if (this.difficulty < 80) { ctx.fillStyle = '#f84'; ctx.fillText('★★★ 困难', al, mt - 4); }
+        else { ctx.fillStyle = '#f44'; ctx.fillText('★★★★ 传说', al, mt - 4); }
+    }
+};
+
+// ======================== 启动 ========================
+window.addEventListener('DOMContentLoaded', () => {
+    UI.init();
+    // 升级按钮事件
+    document.getElementById('uBtn').addEventListener('click', () => {
+        if (!Game.upgradeRod()) {
+            document.getElementById('uInfo').textContent = '❌ 金币不足！';
+            document.getElementById('uInfo').style.color = '#e44';
+        } else {
+            document.getElementById('uInfo').textContent = '✅ 升级成功！';
+            document.getElementById('uInfo').style.color = '#4a4';
+            UI.refreshUpgrade();
+        }
+    });
+});
+
+// 关闭页面时自动保存
+window.addEventListener('beforeunload', () => Game.save());
+</script>
+</body>
+</html>
