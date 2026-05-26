@@ -191,6 +191,7 @@ const Game = {
         ['白条鱼','普通',0.5,1.5,3,'🐟','河里到处都是',5,1],
         ['鲫鱼','普通',1,3,6,'🐟','河产鲫鱼',10,1],
         ['马口鱼','普通',0.3,1,5,'🐟','嘴巴特别大',8,1],
+        ['鲤鱼','普通',2,5,10,'🐟','河鲤活力十足',15,1],
         ['虹鳟鱼','稀有',2,4,32,'🐠','色彩斑斓',48,1],
         ['鳜鱼','稀有',2,5,35,'🐠','河中珍品',50,1],
         ['鲶鱼','稀有',6,12,45,'🐠','大河鲶鱼',60,1],
@@ -318,6 +319,7 @@ const UI = {
         this.setupMiniGame();
         this.setupEvents();
         this.updateAll();
+        document.getElementById('sCol').textContent = '0/' + Game.fishDB.length;
         this.startSceneAnim();
     },
 
@@ -787,13 +789,13 @@ const UI = {
         document.getElementById('sGold').textContent = Game.totalGoldEarned;
         document.getElementById('sRare').textContent = Game.rareCaught;
         document.getElementById('sLegend').textContent = Game.legendaryCaught;
-        document.getElementById('sCol').textContent = Game.collection.size + '/27';
+        document.getElementById('sCol').textContent = Game.collection.size + '/' + Game.fishDB.length;
         document.getElementById('sRod').textContent = 'Lv.' + Game.rodLevel;
     },
 
     refreshUpgrade() {
         document.getElementById('uLevel').textContent = '🎣 Lv.' + Game.rodLevel + '（最大 Lv.5）';
-        document.getElementById('uEffect').textContent =
+    document.getElementById('uEffect').textContent =
             '控制条大小：' + Math.round(Game.getBarHalf() * 100) + '%';
         if (Game.isMaxLevel()) {
             document.getElementById('uCost').textContent = '🏆 已满级！';

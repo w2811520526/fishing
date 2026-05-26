@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(javac -encoding UTF-8 -d \"/d/新建文件夹/fishing/bin\" \"/d/新建文件夹/fishing/src/fishing/\"*.java)",
+      "Bash(java -cp \"/d/新建文件夹/fishing/bin\" fishing.FishingGame)",
+      "Bash(kill %1)",
+      "Bash(jar cfe *)"
+    ]
+  }
+}

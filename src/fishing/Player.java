@@ -1,9 +1,12 @@
 package fishing;
 
+import java.io.*;
 import java.util.ArrayList;
 import java.util.HashSet;
 
-public class Player {
+public class Player implements Serializable {
+    private static final long serialVersionUID = 1L;
+    private static final String SAVE_FILE = "fishing_save.dat";
     private int gold = 20;                 // 初始金币
     private int rodLevel = 1;              // 鱼竿等级 1~5
     private String currentSpot = "湖泊";    // 当前钓鱼点
@@ -88,4 +91,40 @@ public class Player {
     public int getTotalGoldEarned() { return totalGoldEarned; }
     public int getRareCaught() { return rareCaught; }
     public int getLegendaryCaught() { return legendaryCaught; }
+
+    // ===== 存档 =====
+    public void save() {
+        try (ObjectOutputStream out = new ObjectOutputStream(new FileOutputStream(SAVE_FILE))) {
+            out.writeObject(this);
+        } catch (IOException e) {
+            System.err.println("保存失败: " + e.getMessage());
+        }
+    }
+
+    public static Player load() {
+        File f = new File(SAVE_FILE);
+        if (!f.exists()) return null;
+        try (ObjectInputStream in = new ObjectInputStream(new FileInputStream(f))) {
+            return (Player) in.readObject();
+        } catch (IOException | ClassNotFoundException e) {
+            System.err.println("读取存档失败: " + e.getMessage());
+            return null;
+        }
+    }
+
+    public void resetState() {
+        gold = 20;
+        rodLevel = 1;
+        currentSpot = "湖泊";
+        inventory.clear();
+        collection.clear();
+        totalCaught = 0;
+        totalGoldEarned = 0;
+        rareCaught = 0;
+        legendaryCaught = 0;
+    }
+
+    public static void deleteSave() {
+        new File(SAVE_FILE).delete();
+    }
 }

@@ -13,6 +13,7 @@ public class FishingGame extends JFrame {
     // ============== 数据 ==============
     private Player player;
     private Random random = new Random();
+    private int totalFishSpecies; // 鱼种总数
 
     // ============== 组件 - 状态栏 ==============
     private JLabel goldLabel;
@@ -114,7 +115,9 @@ public class FishingGame extends JFrame {
 
     // ============== 构造器 ==============
     public FishingGame() {
-        player = new Player();
+        Player loaded = Player.load();
+        player = loaded != null ? loaded : new Player();
+        for (String[][] spot : fishDatabase) totalFishSpecies += spot.length;
 
         setTitle("\uD83C\uDFA3 钓鱼大师");
         setSize(820, 580);
@@ -127,6 +130,7 @@ public class FishingGame extends JFrame {
         add(createCenterPanel(), BorderLayout.CENTER);
 
         updateStatusBar();
+            player.save();
     }
 
     // =========================================================
@@ -155,6 +159,7 @@ public class FishingGame extends JFrame {
         spotCombo.setForeground(Color.WHITE);
         spotCombo.addActionListener(e -> {
             player.setCurrentSpot((String) spotCombo.getSelectedItem());
+            scenePanel.setCurrentSpot(player.getCurrentSpot());
             fishLogArea.append("切换到 " + player.getCurrentSpot() + " 垂钓\n");
         });
 
@@ -238,7 +243,6 @@ public class FishingGame extends JFrame {
         centerPanel.add(createCollectionPanel(),CARD_COLLECTION);
         centerPanel.add(createStatsPanel(),     CARD_STATS);
         centerPanel.add(createUpgradePanel(),   CARD_UPGRADE);
-
         cardLayout.show(centerPanel, CARD_FISH);
         return centerPanel;
     }
@@ -477,6 +481,7 @@ public class FishingGame extends JFrame {
                 }
                 resetAfterFishing();
                 updateStatusBar();
+            player.save();
             }
         });
         miniGame.start();
@@ -616,6 +621,7 @@ public class FishingGame extends JFrame {
             player.removeFish(row);
             refreshInventoryTable();
             updateStatusBar();
+            player.save();
             fishLogArea.append("💰 卖出 " + fish.getName() + "，获得 " + price + " 金币\n");
         }
     }
@@ -702,7 +708,7 @@ public class FishingGame extends JFrame {
         statTotalGold   = createStatRow("\uD83D\uDCB0 总赚金币", "0", gridPanel, labelFont, valFont);
         statRareCaught  = createStatRow("\u2728 稀有鱼数", "0", gridPanel, labelFont, valFont);
         statLegendaryCaught = createStatRow("\uD83C\uDF1F 传说鱼数", "0", gridPanel, labelFont, valFont);
-        statCollected   = createStatRow("\uD83D\uDCD6 图鉴收集", "0/27", gridPanel, labelFont, valFont);
+        statCollected   = createStatRow("\uD83D\uDCD6 图鉴收集", "0/0", gridPanel, labelFont, valFont);
         statRodLevel    = createStatRow("\uD83C\uDFA3 鱼竿等级", "Lv.1", gridPanel, labelFont, valFont);
 
         panel.add(gridPanel, BorderLayout.CENTER);
@@ -803,6 +809,7 @@ public class FishingGame extends JFrame {
             player.upgradeRod();
             refreshUpgradePanel();
             updateStatusBar();
+            player.save();
             upgradeInfoLabel.setText("\u2705 升级成功！当前鱼竿等级 Lv." + player.getRodLevel());
             upgradeInfoLabel.setForeground(new Color(0, 130, 0));
             fishLogArea.append("\u2B06 鱼竿升级到 Lv." + player.getRodLevel() + "！\n");
@@ -815,6 +822,7 @@ public class FishingGame extends JFrame {
     // =========================================================
     //  面板切换
     // =========================================================
+
     private void switchToFish()       { cardLayout.show(centerPanel, CARD_FISH); }
     private void switchToInventory() {
         refreshInventoryTable();
@@ -858,6 +866,7 @@ public class FishingGame extends JFrame {
         addGold100.addActionListener(e -> {
             player.addGold(100);
             updateStatusBar();
+            player.save();
             fishLogArea.append("\uD83D\uDCB0 管理员发放了 100 金币\n");
             JOptionPane.showMessageDialog(this, "已增加 100 金币！当前金币：" + player.getGold());
         });
@@ -870,6 +879,7 @@ public class FishingGame extends JFrame {
         addGold500.addActionListener(e -> {
             player.addGold(500);
             updateStatusBar();
+            player.save();
             fishLogArea.append("\uD83D\uDCB5 管理员发放了 500 金币\n");
             JOptionPane.showMessageDialog(this, "已增加 500 金币！当前金币：" + player.getGold());
         });
@@ -882,6 +892,7 @@ public class FishingGame extends JFrame {
         setRodBtn.addActionListener(e -> {
             while (!player.isMaxLevel()) player.upgradeRod();
             updateStatusBar();
+            player.save();
             fishLogArea.append("\uD83C\uDFA3 管理员将鱼竿升到满级\n");
             JOptionPane.showMessageDialog(this, "鱼竿已满级 Lv.5！");
         });
@@ -895,11 +906,30 @@ public class FishingGame extends JFrame {
             int amount = 9999 - player.getGold();
             if (amount > 0) player.addGold(amount);
             updateStatusBar();
+            player.save();
             fishLogArea.append("\uD83D\uDCB8 管理员已将金币拉满\n");
             JOptionPane.showMessageDialog(this, "金币已满！");
         });
         panel.add(maxGold, gbc);
 
+
+        gbc.gridy = 3; gbc.gridx = 0;
+        gbc.gridwidth = 2;
+        JButton resetBtn = new JButton("🔄 重新开始");
+        resetBtn.setFont(FontUtil.bold(14));
+        resetBtn.setBackground(new Color(200, 60, 60));
+        resetBtn.setForeground(Color.WHITE);
+        resetBtn.addActionListener(e -> {
+            int confirm = JOptionPane.showConfirmDialog(this, "确定重新开始？所有进度将被清空！", "确认", JOptionPane.YES_NO_OPTION);
+            if (confirm == JOptionPane.YES_OPTION) {
+                Player.deleteSave();
+                player.resetState();
+                updateStatusBar();
+                fishLogArea.append("🔄 游戏已重置\n");
+                JOptionPane.showMessageDialog(this, "游戏已重置！");
+            }
+        });
+        panel.add(resetBtn, gbc);
         cardLayout.show(centerPanel, CARD_FISH);
 
         JOptionPane.showMessageDialog(this, panel, "\u2699\uFE0F 管理员控制台",

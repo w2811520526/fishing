@@ -25,6 +25,10 @@ public class FishingScenePanel extends JPanel {
     private Runnable onPowerRelease;     // 蓄力释放回调
     private Runnable onBiteTimeout;      // 咬钩超时回调
 
+    private String currentSpot = "湖泊"; // 当前钓点
+
+    public void setCurrentSpot(String spot) { this.currentSpot = spot; }
+
     public FishingScenePanel() {
         setPreferredSize(new Dimension(400, 280));
         setBackground(new Color(135, 190, 235));
@@ -141,11 +145,18 @@ public class FishingScenePanel extends JPanel {
             g2d.fillArc(cx - 60, cy - 40, 120, 80, 0, 180);
         }
 
-        // ---- 水面 ----
-        Color waterTop = new Color(50, 150, 210);
-        Color waterBot = new Color(20, 80, 140);
-        int si = 0; // simplified - just use lake
-        try { String spot = UIManager.getString("spot"); } catch(Exception e) {}
+        // ---- 水面（根据钓点切换颜色） ----
+        Color waterTop, waterBot;
+        if ("河流".equals(currentSpot)) {
+            waterTop = new Color(60, 175, 140);
+            waterBot = new Color(25, 120, 80);
+        } else if ("海洋".equals(currentSpot)) {
+            waterTop = new Color(40, 140, 210);
+            waterBot = new Color(10, 50, 110);
+        } else {
+            waterTop = new Color(50, 150, 210);
+            waterBot = new Color(20, 80, 140);
+        }
         GradientPaint water = new GradientPaint(0, waterLine, waterTop, 0, h, waterBot);
         g2d.setPaint(water);
         g2d.fillRect(0, waterLine, w, h - waterLine);

@@ -1,11 +1,15 @@
 package fishing;
 
 import java.awt.Color;
+import java.io.IOException;
+import java.io.ObjectInputStream;
+import java.io.Serializable;
 
-public class Fish {
+public class Fish implements Serializable {
+    private static final long serialVersionUID = 1L;
     private String name;
     private int level;       // 1★~5★
-    private String rarity;   // 由 level 派生
+    private transient String rarity;   // 由 level 派生，反序列化时重新计算
     private double weight;
     private int price;
     private String emoji;
@@ -22,6 +26,11 @@ public class Fish {
         this.emoji = emoji;
         this.desc = desc;
         this.spot = spot;
+    }
+
+    private void readObject(ObjectInputStream in) throws IOException, ClassNotFoundException {
+        in.defaultReadObject();
+        rarity = level >= 5 ? "传说" : level >= 3 ? "稀有" : "普通";
     }
 
     public String getName() { return name; }
